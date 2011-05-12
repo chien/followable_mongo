@@ -1,0 +1,160 @@
+= Followable Mongo
+
+followable_mongo allows you to make your Mongoid::Document or MongoMapper::Document objects followable and tabulate follows countfor you. For instance, in a forum, a user can follow a post or a comment. It's optimized for speed by using only ONE database request per collection to validate, update, and retrieve updated data.
+
+Based on the voting gem https://github.com/vinova/voteable_mongo
+
+== Why followable_mongo?
+
+followable_mongo takes advantage of the Mongo document-oriented database to store all related follows data inside the followable document. That has the following benefits:
+
+* No need to maintain additional follows table or follows collection.
+
+* When followable document is loaded, all follows data related to it can also be loaded, no more additional database requests to see how many follows this document has, who is following, etc...
+
+* When following a document, followable_mongo validates follow data, updates followable document and retrieves updated data using only ONE database request thanks to atomic findAndModify operation.
+
+== Installation
+
+=== Rails 3.x
+
+To install the gem, add this to your Gemfile
+
+  gem 'mongoid'
+  gem 'followable_mongo', :git => ''
+
+After that, remember to run "bundle install"
+
+== Usage
+
+=== Make Post and Comment followable, User become the follower
+
+== Mongoid
+post.rb
+
+    class Post
+      include Mongoid::Document
+      include Mongo::Followable
+
+      has_many :comments
+    end
+
+comment.rb
+
+    require 'post'
+
+    class Comment
+      include Mongoid::Document
+      include Mongo::Followable
+
+      belongs_to :post
+
+    end
+
+user.rb
+
+    class User
+      include Mongoid::Document
+      include Mongo::Follower
+    end
+
+
+== MongoMapper
+post.rb
+
+    class Post
+      include MongoMapper::Document
+      include Mongo::Followable
+
+      many :comments
+    end
+
+comment.rb
+
+    require 'post'
+
+    class Comment
+      include MongoMapper::Document
+      include Mongo::Followable
+
+      belongs_to :post
+    end
+
+user.rb
+
+    class User
+      include MongoMapper::Document
+      include Mongo::Follower
+    end
+
+
+=== Follow a document
+
+    @user.follow(@post)
+
+Is equivalent to
+    @user.follow(:followed => @post)
+    @post.follow(:follower => @user)
+
+In case you don't need to init follower and / or followed objects you can
+    @user.follow(:followed_class => Post, :followed_id => post_id)
+    @post.follow(:follower_id => user_id)
+    Post.follow(:follower_id => user_id, :followed_id => post_id)
+
+=== Undo a follow
+
+    @user.unfollow(@comment)
+
+=== If you have follower_id and followed_id you don't need to init follower and followed objects (suitable for API calls)
+
+New follow
+    Post.follow(:follower_id => user_id, :followed_id => post_id)
+
+Un-follow
+    Post.follow(:follower_id => user_id, :followed_id => post_id)
+
+Note: follow function always return updated followed object
+
+=== Check if followed?
+
+    @user.following?(@post)
+    @user.following?(:followed_class => Post, :followed_id => post_id)
+    @post.followed_by?(@user)
+    @post.followed_by?(user_id)
+
+=== Get follows count
+
+    puts @post.follows_count
+
+=== Get followers given followed object and follower class
+
+    @post.followers(User)
+    - or -
+    User.following(@post)
+
+=== Get the list of followed objects of a class
+
+    Post.followed_by(@user)
+
+== Utilities
+
+=== Set counter to 0 for uninitialized followable objects in order sort and query
+Rails
+    rake mongo:followable:init_stats
+Ruby
+    Mongo::Followable::Tasks::init_stats
+
+=== Re-generate counters
+Rails
+    rake mongo:followable:remake_stats
+Ruby
+    Mongo::Followable::Tasks.remake_stats
+
+== Credits
+* John Lynch - Author
+* Alex Nguyen - Author of voteable_mongo
+* Contributors[https://github.com/vinova/followable_mongo/contributors]
+
+Copyright (c) 2011 Rigel Group, LLC
+
+Licensed under the MIT license.
